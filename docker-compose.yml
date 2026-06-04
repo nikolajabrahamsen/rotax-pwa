@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  rotax-pwa:
+    build: .
+    container_name: rotax-pwa
+    ports:
+      - "3000:3000"
+    environment:
+      - HOST=0.0.0.0
+      - CHOKIDAR_USEPOLLING=true
+      - REACT_APP_SUPABASE_URL=https://hqmwsehhouofkswyjdvh.supabase.co
+      - REACT_APP_SUPABASE_ANON_KEY=DIN_ANON_NØGLE_HER
+    volumes:
+      - ./src:/app/src
+      - ./public:/app/public
+    restart: unless-stopped
