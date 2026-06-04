@@ -247,24 +247,116 @@ export function AdminUsers() {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [editUser, setEditUser] = useState(null);
+  const [editForm, setEditForm] = useState({});
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
 
-  useEffect(() => {
-    supabase.from('profiles').select('*').order('name').then(({ data }) => {
-      setUsers(data || []);
-      setLoading(false);
+  const load = () => supabase.from('profiles').select('*').order('name').then(({ data }) => { setUsers(data || []); setLoading(false); });
+  useEffect(() => { load(); }, []);
+
+  const openEdit = (u) => {
+    setEditUser(u);
+    setEditForm({
+      name: u.name || '', phone: u.phone || '',
+      license_number: u.license_number || '', license_valid: u.license_valid ?? null,
+      transponder: u.transponder || '', kart_class: u.kart_class || '',
+      kart_number: u.kart_number || '', dob: u.dob || '',
+      club: u.club || '', type: u.type || 'driver', is_official: u.is_official || false,
     });
-  }, []);
+  };
+
+  const saveEdit = async () => {
+    setSaving(true);
+    await supabase.from('profiles').update({
+      name: editForm.name, phone: editForm.phone || null,
+      license_number: editForm.license_number || null,
+      license_valid: editForm.license_valid,
+      transponder: editForm.transponder || null,
+      kart_class: editForm.kart_class || null,
+      kart_number: editForm.kart_number ? parseInt(editForm.kart_number) : null,
+      dob: editForm.dob || null, club: editForm.club || null,
+      type: editForm.type, is_official: editForm.is_official,
+    }).eq('id', editUser.id);
+    setSaving(false); setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+    load();
+  };
 
   const filtered = users.filter(u => u.name?.toLowerCase().includes(search.toLowerCase()) || u.email?.toLowerCase().includes(search.toLowerCase()));
+  const setF = (k, v) => setEditForm(f => ({ ...f, [k]: v }));
 
   if (loading) return <Spinner />;
+
+  // Edit panel
+  if (editUser) return (
+    <div style={{ flex: 1, padding: 20, overflowY: 'auto' }}>
+      <Btn small variant="ghost" onClick={() => setEditUser(null)} style={{ marginBottom: 14 }}>← Tilbage</Btn>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 16 }}>
+        <div style={{ width: 48, height: 48, borderRadius: '50%', background: `linear-gradient(135deg,${C.red},${C.redDark})`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, fontWeight: 900, color: 'white', flexShrink: 0 }}>{editUser.name?.charAt(0)}</div>
+        <div>
+          <div style={{ fontWeight: 700, color: C.text, fontSize: 16 }}>{editUser.name}</div>
+          <div style={{ color: C.textMuted, fontSize: 12 }}>{editUser.email}</div>
+        </div>
+      </div>
+
+      <Card accentColor={C.red}>
+        <div style={{ color: C.textMuted, fontSize: 10, letterSpacing: 2, marginBottom: 12 }}>BRUGERTYPE</div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
+          {[['driver', 'KØRER', C.red], ['parent', 'FORÆLDER', C.blue], ['official', 'OFFICIAL', C.purple], ['admin', 'ADMIN', C.orange]].map(([val, label, col]) => (
+            <button key={val} onClick={() => setF('type', val)} style={{ background: editForm.type === val ? col + '33' : C.surface2, border: `1px solid ${editForm.type === val ? col : C.border}`, borderRadius: 20, padding: '5px 14px', color: editForm.type === val ? col : C.textMuted, cursor: 'pointer', fontSize: 12, fontWeight: editForm.type === val ? 700 : 400 }}>{label}</button>
+          ))}
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+          <span style={{ color: C.textMuted, fontSize: 11 }}>Official-rolle</span>
+          <button onClick={() => setF('is_official', !editForm.is_official)} style={{ background: editForm.is_official ? C.purple + '33' : C.surface2, border: `1px solid ${editForm.is_official ? C.purple : C.border}`, borderRadius: 20, padding: '4px 12px', color: editForm.is_official ? C.purple : C.textMuted, cursor: 'pointer', fontSize: 11 }}>{editForm.is_official ? '✓ AKTIV' : 'INAKTIV'}</button>
+        </div>
+      </Card>
+
+      <Card>
+        <div style={{ color: C.textMuted, fontSize: 10, letterSpacing: 2, marginBottom: 10 }}>PERSONLIGE OPLYSNINGER</div>
+        <Input label="Navn" value={editForm.name} onChange={v => setF('name', v)} placeholder="Fuldt navn" />
+        <Input label="Telefon" value={editForm.phone} onChange={v => setF('phone', v)} placeholder="Mobilnummer" />
+        <Input label="Fødselsdato" value={editForm.dob} onChange={v => setF('dob', v)} placeholder="YYYY-MM-DD" />
+        <Input label="Klub" value={editForm.club} onChange={v => setF('club', v)} placeholder="Klubnavn" />
+      </Card>
+
+      <Card>
+        <div style={{ color: C.textMuted, fontSize: 10, letterSpacing: 2, marginBottom: 10 }}>KØRERDATA</div>
+        <Input label="Licensnummer" value={editForm.license_number} onChange={v => setF('license_number', v)} placeholder="DK-2026-XXXX" />
+        <div style={{ marginBottom: 10 }}>
+          <div style={{ color: C.textMuted, fontSize: 10, letterSpacing: 1, marginBottom: 6, textTransform: 'uppercase' }}>Licens status</div>
+          <div style={{ display: 'flex', gap: 6 }}>
+            {[[true, '✅ Godkendt', C.green], [false, '❌ Ugyldig', C.red], [null, '⏳ Ikke tjekket', C.orange]].map(([val, label, col]) => (
+              <button key={String(val)} onClick={() => setF('license_valid', val)} style={{ background: editForm.license_valid === val ? col + '22' : C.surface2, border: `1px solid ${editForm.license_valid === val ? col : C.border}`, borderRadius: 6, padding: '5px 10px', color: editForm.license_valid === val ? col : C.textMuted, cursor: 'pointer', fontSize: 11 }}>{label}</button>
+            ))}
+          </div>
+        </div>
+        <Input label="Transpondernummer" value={editForm.transponder} onChange={v => setF('transponder', v)} placeholder="T-XXXX" />
+        <div style={{ marginBottom: 10 }}>
+          <div style={{ color: C.textMuted, fontSize: 10, letterSpacing: 1, marginBottom: 6, textTransform: 'uppercase' }}>Klasse</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            {Object.entries(DEFAULT_CLASSES).map(([cls, rule]) => (
+              <button key={cls} onClick={() => setF('kart_class', cls)} style={{ background: editForm.kart_class === cls ? rule.color + '33' : C.surface2, border: `1px solid ${editForm.kart_class === cls ? rule.color : C.border}`, borderRadius: 20, padding: '4px 10px', fontSize: 11, cursor: 'pointer', color: editForm.kart_class === cls ? rule.color : C.textMuted }}>{cls}</button>
+            ))}
+          </div>
+        </div>
+        <Input label="Kart-nummer" value={String(editForm.kart_number || '')} onChange={v => setF('kart_number', v)} placeholder="eks. 98" type="number" />
+      </Card>
+
+      {saved
+        ? <div style={{ background: C.green + '22', border: `1px solid ${C.green}44`, borderRadius: 8, padding: 14, textAlign: 'center', color: C.green, fontWeight: 700 }}>✅ Gemt!</div>
+        : <Btn onClick={saveEdit} loading={saving} fullWidth>💾 GEM ÆNDRINGER</Btn>
+      }
+    </div>
+  );
 
   return (
     <div style={{ flex: 1, padding: 20, overflowY: 'auto' }}>
       <SectionHeader title="Brugere" subtitle={`${users.length} registrerede`} />
       <Input value={search} onChange={setSearch} placeholder="Søg på navn eller e-mail..." />
       {filtered.map(u => (
-        <Card key={u.id} style={{ padding: '11px 14px' }}>
+        <Card key={u.id} style={{ padding: '11px 14px', cursor: 'pointer' }} onClick={() => openEdit(u)}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <div>
               <div style={{ fontWeight: 700, color: C.text, fontSize: 13 }}>{u.name}</div>
@@ -277,6 +369,7 @@ export function AdminUsers() {
                 {u.type === 'admin' ? 'ADMIN' : u.type === 'official' ? 'OFFICIAL' : u.type === 'parent' ? 'FORÆLDER' : 'KØRER'}
               </Badge>
               {u.is_official && u.type !== 'official' && <Badge color={C.purple} style={{ fontSize: 10 }}>+OFFICIAL</Badge>}
+              <span style={{ color: C.textDim, fontSize: 18 }}>›</span>
             </div>
           </div>
         </Card>
