@@ -7,7 +7,8 @@ import LoginScreen from './screens/LoginScreen';
 import CalendarScreen from './screens/CalendarScreen';
 import ProfileScreen from './screens/ProfileScreen';
 import { PenaltiesScreen, DocumentsScreen, StandingsScreen, LiveTimingScreen, NotificationsScreen } from './screens/DataScreens';
-import { AdminDashboard, AdminEvents, AdminRegistrations, AdminUsers, AdminPenalties, AdminDocuments, AdminNotifications, AdminStandings } from './screens/AdminScreens';
+import { RegulationsScreen, OfficialWeightScreen, OfficialNoseScreen, OfficialInspectionScreen, DriverListScreen, LicenseControlScreen } from './screens/OfficialScreens';
+import { AdminDashboard, AdminEvents, AdminSeries, AdminClasses, AdminRegistrations, AdminUsers, AdminOfficials, AdminPenalties, AdminDocuments, AdminNotifications, AdminStandings, AdminInspection, AdminLicenseControl } from './screens/AdminScreens';
 
 // ── USER TABS ─────────────────────────────────────────────────────
 const MAIN_TABS = [
@@ -36,12 +37,17 @@ const GUEST_TABS = [
 const ADMIN_TABS = [
   { id: 'dashboard',     icon: '📊', label: 'Dashboard' },
   { id: 'events',        icon: '📅', label: 'Løb' },
-  { id: 'registrations', icon: '📝', label: 'Tilmeldinger' },
+  { id: 'series',        icon: '🏟', label: 'Serier' },
+  { id: 'classes',       icon: '🎯', label: 'Klasser' },
+  { id: 'registrations', icon: '📝', label: 'Tilmeld.' },
   { id: 'users',         icon: '👥', label: 'Brugere' },
+  { id: 'officials',     icon: '🔒', label: 'Officials' },
+  { id: 'notifications', icon: '🔔', label: 'Notif.' },
+  { id: 'documents',     icon: '📄', label: 'Docs' },
   { id: 'penalties',     icon: '⚠️', label: 'Straffe' },
-  { id: 'documents',     icon: '📄', label: 'Dokumenter' },
-  { id: 'notifications', icon: '🔔', label: 'Notifikationer' },
-  { id: 'standings',     icon: '🏆', label: 'Mesterskab' },
+  { id: 'inspection',    icon: '🔍', label: 'Indr.' },
+  { id: 'licensecheck',  icon: '🪪', label: 'Licensktr.' },
+  { id: 'standings',     icon: '🏆', label: 'Mskb.' },
 ];
 
 function PlaceholderScreen({ title }) {
@@ -64,11 +70,16 @@ function AdminPanel({ signOut }) {
     switch (sec) {
       case 'dashboard':     return <AdminDashboard />;
       case 'events':        return <AdminEvents />;
+      case 'series':        return <AdminSeries />;
+      case 'classes':       return <AdminClasses />;
       case 'registrations': return <AdminRegistrations />;
       case 'users':         return <AdminUsers />;
-      case 'penalties':     return <AdminPenalties />;
-      case 'documents':     return <AdminDocuments />;
+      case 'officials':     return <AdminOfficials />;
       case 'notifications': return <AdminNotifications />;
+      case 'documents':     return <AdminDocuments />;
+      case 'penalties':     return <AdminPenalties />;
+      case 'inspection':    return <AdminInspection />;
+      case 'licensecheck':  return <AdminLicenseControl />;
       case 'standings':     return <AdminStandings />;
       default:              return <PlaceholderScreen title={active?.label} />;
     }
@@ -119,8 +130,14 @@ function UserApp({ signOut, profile, isOfficial, isGuest }) {
       case 'standings': return <StandingsScreen />;
       case 'timing':    return <LiveTimingScreen />;
       case 'penalties': return <PenaltiesScreen />;
+      case 'regs':      return <RegulationsScreen />;
       case 'notif':     return <NotificationsScreen isOfficial={isOfficial} />;
       case 'profile':   return <ProfileScreen />;
+      case 'weight':    return <OfficialWeightScreen />;
+      case 'nose':      return <OfficialNoseScreen />;
+      case 'reporting': return <OfficialInspectionScreen />;
+      case 'licensecheck': return <LicenseControlScreen />;
+      case 'driverlist':   return <DriverListScreen />;
       default:          return <PlaceholderScreen title={activeTab?.label} />;
     }
   };
