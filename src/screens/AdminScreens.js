@@ -735,3 +735,370 @@ export function AdminStandings() {
     </div>
   );
 }
+
+// ── ADMIN SERIES ─────────────────────────────────────────────────
+export function AdminSeries() {
+  const [series, setSeries] = useState([]);
+  const [name, setName] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    supabase.from('race_series').select('*').order('created_at').then(({ data }) => setSeries(data || []));
+  }, []);
+
+  const create = async () => {
+    if (!name) return;
+    setSaving(true);
+    const { data } = await supabase.from('race_series').insert({ name }).select().single();
+    setSeries(prev => [...prev, data]);
+    setName(''); setSaving(false);
+  };
+
+  return (
+    <div style={{ flex: 1, padding: 20, overflowY: 'auto' }}>
+      <SectionHeader title="Løbsserier" />
+      <Card accentColor={C.red}>
+        <Input label="Ny serie" value={name} onChange={setName} placeholder="f.eks. Rotax Vinter Cup 2027" />
+        <Btn onClick={create} loading={saving} fullWidth>+ Opret serie</Btn>
+      </Card>
+      {series.map(s => (
+        <Card key={s.id} style={{ padding: '10px 14px' }}>
+          <div style={{ fontWeight: 700, color: C.text, fontSize: 13 }}>{s.name}</div>
+          <div style={{ color: C.textMuted, fontSize: 11 }}>{new Date(s.created_at).toLocaleDateString('da-DK')}</div>
+        </Card>
+      ))}
+    </div>
+  );
+}
+
+// ── ADMIN CLASSES ─────────────────────────────────────────────────
+export function AdminClasses() {
+  const [classes, setClasses] = useState([]);
+  const [showAdd, setShowAdd] = useState(false);
+  const [form, setForm] = useState({ name: '', min_age: '', max_age: '', color: '#E30613' });
+  const [saving, setSaving] = useState(false);
+  const COLORS = ['#E30613','#2080FF','#FF8800','#00CC66','#9B59B6','#00CCCC','#FFD700'];
+
+  useEffect(() => {
+    supabase.from('class_rules').select('*').order('min_age').then(({ data }) => setClasses(data || []));
+  }, []);
+
+  const create = async () => {
+    if (!form.name) return;
+    setSaving(true);
+    const { data } = await supabase.from('class_rules').insert({ name: form.name, min_age: parseInt(form.min_age) || 0, max_age: parseInt(form.max_age) || 99, color: form.color }).select().single();
+    setClasses(prev => [...prev, data]);
+    setForm({ name: '', min_age: '', max_age: '', color: '#E30613' });
+    setShowAdd(false); setSaving(false);
+  };
+
+  const deleteClass = async (id) => {
+    await supabase.from('class_rules').delete().eq('id', id);
+    setClasses(prev => prev.filter(c => c.id !== id));
+  };
+
+  return (
+    <div style={{ flex: 1, padding: 20, overflowY: 'auto' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
+        <SectionHeader title="Klasser" />
+        <Btn small onClick={() => setShowAdd(!showAdd)}>+ Ny klasse</Btn>
+      </div>
+      {showAdd && (
+        <Card accentColor={C.red} style={{ marginBottom: 12 }}>
+          <Input label="Klassenavn" value={form.name} onChange={v => setForm(f => ({ ...f, name: v }))} placeholder="f.eks. Rotax E20" />
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+            <Input label="Min alder" value={form.min_age} onChange={v => setForm(f => ({ ...f, min_age: v }))} placeholder="13" type="number" />
+            <Input label="Maks alder" value={form.max_age} onChange={v => setForm(f => ({ ...f, max_age: v }))} placeholder="17" type="number" />
+          </div>
+          <div style={{ marginBottom: 10 }}>
+            <div style={{ color: C.textMuted, fontSize: 10, letterSpacing: 1, marginBottom: 6, textTransform: 'uppercase' }}>Farve</div>
+            <div style={{ display: 'flex', gap: 6 }}>
+              {COLORS.map(col => (
+                <button key={col} onClick={() => setForm(f => ({ ...f, color: col }))} style={{ width: 28, height: 28, borderRadius: '50%', background: col, border: `3px solid ${form.color === col ? 'white' : 'transparent'}`, cursor: 'pointer' }} />
+              ))}
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <Btn small onClick={create} loading={saving}>Opret</Btn>
+            <Btn small variant="ghost" onClick={() => setShowAdd(false)}>Annuller</Btn>
+          </div>
+        </Card>
+      )}
+      {classes.map(cls => (
+        <Card key={cls.id} style={{ padding: '11px 14px', borderLeft: `3px solid ${cls.color || C.red}` }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <div style={{ fontWeight: 700, color: C.text, fontSize: 13 }}>{cls.name}</div>
+              <div style={{ color: C.textMuted, fontSize: 11 }}>Alder: {cls.min_age}–{cls.max_age >= 99 ? '∞' : cls.max_age + ' år'}</div>
+            </div>
+            <Btn small variant="danger" onClick={() => deleteClass(cls.id)}>Slet</Btn>
+          </div>
+        </Card>
+      ))}
+    </div>
+  );
+}
+
+// ── ADMIN OFFICIALS ──────────────────────────────────────────────
+export function AdminOfficials() {
+  const [officials, setOfficials] = useState([]);
+  const [events, setEvents] = useState([]);
+  const [sel, setSel] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    Promise.all([
+      supabase.from('profiles').select('*').eq('is_official', true).order('name'),
+      supabase.from('events').select('id, name, date').order('date'),
+    ]).then(([o, e]) => {
+      setOfficials(o.data || []);
+      setEvents(e.data || []);
+      setLoading(false);
+    });
+  }, []);
+
+  const toggleEvent = async (officialId, eventId) => {
+    const official = officials.find(o => o.id === officialId);
+    // Check if access exists
+    const { data: existing } = await supabase.from('official_event_access').select('id').eq('user_id', officialId).eq('event_id', eventId).single();
+    if (existing) {
+      await supabase.from('official_event_access').delete().eq('user_id', officialId).eq('event_id', eventId);
+    } else {
+      await supabase.from('official_event_access').insert({ user_id: officialId, event_id: eventId });
+    }
+    // Reload
+    const { data } = await supabase.from('profiles').select('*').eq('is_official', true).order('name');
+    setOfficials(data || []);
+  };
+
+  if (loading) return <Spinner />;
+
+  return (
+    <div style={{ flex: 1, padding: 20, overflowY: 'auto' }}>
+      <SectionHeader title="Officials" subtitle="Godkend officials til løb" />
+      {officials.length === 0 && <EmptyState icon="🔒" message="Ingen officials endnu – brugere kan aktivere official-rollen i deres profil" />}
+      {officials.map(o => (
+        <Card key={o.id} style={{ cursor: 'pointer', padding: '11px 14px' }} onClick={() => setSel(sel === o.id ? null : o.id)}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <div style={{ fontWeight: 700, color: C.text, fontSize: 13 }}>{o.name}</div>
+              <div style={{ color: C.textMuted, fontSize: 11 }}>{o.email}</div>
+            </div>
+            <Badge color={C.purple} style={{ fontSize: 10 }}>OFFICIAL</Badge>
+          </div>
+          {sel === o.id && (
+            <div style={{ marginTop: 10, borderTop: `1px solid ${C.border}`, paddingTop: 10 }}>
+              <div style={{ color: C.textMuted, fontSize: 10, letterSpacing: 1, marginBottom: 8 }}>GODKEND TIL LØB:</div>
+              {events.map(ev => {
+                const approved = (o.approved_events || []).includes(ev.id);
+                return (
+                  <div key={ev.id} onClick={e => { e.stopPropagation(); toggleEvent(o.id, ev.id); }} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 0', borderBottom: `1px solid ${C.border}`, cursor: 'pointer' }}>
+                    <div style={{ width: 18, height: 18, borderRadius: 4, background: approved ? C.green : C.surface2, border: `1px solid ${approved ? C.green : C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, flexShrink: 0 }}>{approved ? '✓' : ''}</div>
+                    <span style={{ color: C.text, fontSize: 12 }}>{ev.name}</span>
+                    <span style={{ color: C.textMuted, fontSize: 10, marginLeft: 'auto' }}>{ev.date}</span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </Card>
+      ))}
+    </div>
+  );
+}
+
+// ── ADMIN INSPECTION ─────────────────────────────────────────────
+export function AdminInspection() {
+  const [events, setEvents] = useState([]);
+  const [selEv, setSelEv] = useState('');
+  const [inspections, setInspections] = useState([]);
+  const [readySignals, setReadySignals] = useState([]);
+  const [form, setForm] = useState({ driver_name: '', kart_no: '', class: 'Rotax Junior', session: 'Heat 1', video_ok: null, track_ok: null, tech_ok: null, notes: '' });
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    supabase.from('events').select('id, name').order('date').then(({ data }) => {
+      setEvents(data || []);
+      if (data?.[0]) setSelEv(data[0].id);
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!selEv) return;
+    Promise.all([
+      supabase.from('inspections').select('*').eq('event_id', selEv).order('created_at', { ascending: false }),
+      supabase.from('ready_signals').select('*').eq('event_id', selEv).order('created_at', { ascending: false }),
+    ]).then(([i, r]) => { setInspections(i.data || []); setReadySignals(r.data || []); });
+  }, [selEv]);
+
+  const submit = async () => {
+    if (!form.driver_name) return;
+    setSaving(true);
+    await supabase.from('inspections').insert({ event_id: selEv, ...form, checked_by: 'Admin' });
+    await supabase.from('ready_signals').insert({ event_id: selEv, class: form.class, session: form.session, signal_type: 'inspection', sent_by: 'Admin' });
+    const [i, r] = await Promise.all([
+      supabase.from('inspections').select('*').eq('event_id', selEv).order('created_at', { ascending: false }),
+      supabase.from('ready_signals').select('*').eq('event_id', selEv).order('created_at', { ascending: false }),
+    ]);
+    setInspections(i.data || []); setReadySignals(r.data || []);
+    setForm(f => ({ ...f, driver_name: '', kart_no: '', video_ok: null, track_ok: null, tech_ok: null, notes: '' }));
+    setSaving(false);
+  };
+
+  const checks = [['video_ok', '📹 Video'], ['track_ok', '🏁 Banen'], ['tech_ok', '🔩 Teknik']];
+
+  return (
+    <div style={{ flex: 1, padding: 20, overflowY: 'auto' }}>
+      <SectionHeader title="Indrapportering" subtitle="Video, Bane & Teknik" />
+      <div style={{ background: '#1a001a', border: '1px solid #9B59B644', borderRadius: 6, padding: 8, marginBottom: 10, display: 'flex', gap: 6, alignItems: 'center' }}>
+        <span>🔒</span><span style={{ color: C.purple, fontSize: 11, fontWeight: 700 }}>Kun admin & officials</span>
+      </div>
+      {readySignals.length > 0 && (
+        <Card accentColor={C.cyan} style={{ marginBottom: 12 }}>
+          <div style={{ color: C.cyan, fontSize: 10, fontWeight: 700, marginBottom: 8 }}>✓ KLAR-SIGNALER MODTAGET</div>
+          {readySignals.slice(0, 5).map((s, i) => (
+            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: `1px solid ${C.border}` }}>
+              <span style={{ color: C.text, fontSize: 12 }}>{s.class} · {s.session} · {s.signal_type}</span>
+              <span style={{ color: C.textMuted, fontSize: 10 }}>{new Date(s.created_at).toLocaleTimeString('da-DK')}</span>
+            </div>
+          ))}
+        </Card>
+      )}
+      <Select label="Løb" value={selEv} onChange={setSelEv} options={events.map(e => ({ value: e.id, label: e.name }))} />
+      <Card accentColor={C.purple}>
+        <div style={{ display: 'grid', gridTemplateColumns: '80px 1fr', gap: 8 }}>
+          <Input label="Kart #" value={form.kart_no} onChange={v => setForm(f => ({ ...f, kart_no: v }))} placeholder="98" type="number" />
+          <Input label="Kørernavn" value={form.driver_name} onChange={v => setForm(f => ({ ...f, driver_name: v }))} placeholder="Navn" />
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+          <Select label="Klasse" value={form.class} onChange={v => setForm(f => ({ ...f, class: v }))} options={Object.keys(DEFAULT_CLASSES)} />
+          <Select label="Session" value={form.session} onChange={v => setForm(f => ({ ...f, session: v }))} options={SESSION_OPTS} />
+        </div>
+        {checks.map(([key, label]) => (
+          <div key={key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '7px 0', borderBottom: `1px solid ${C.border}` }}>
+            <span style={{ color: C.text, fontSize: 12 }}>{label}</span>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button onClick={() => setForm(f => ({ ...f, [key]: true }))} style={{ background: form[key] === true ? C.green + '33' : C.surface2, border: `1px solid ${form[key] === true ? C.green : C.border}`, borderRadius: 5, padding: '4px 10px', color: form[key] === true ? C.green : C.textMuted, cursor: 'pointer', fontSize: 11 }}>✓ OK</button>
+              <button onClick={() => setForm(f => ({ ...f, [key]: false }))} style={{ background: form[key] === false ? C.red + '33' : C.surface2, border: `1px solid ${form[key] === false ? C.red : C.border}`, borderRadius: 5, padding: '4px 10px', color: form[key] === false ? C.red : C.textMuted, cursor: 'pointer', fontSize: 11 }}>✗ Fejl</button>
+            </div>
+          </div>
+        ))}
+        <textarea value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} rows={2} placeholder="Kommentarer..." style={{ width: '100%', background: C.surface2, border: `1px solid ${C.border}`, borderRadius: 6, padding: '8px 12px', color: C.text, fontSize: 12, boxSizing: 'border-box', resize: 'vertical', marginTop: 8, marginBottom: 8 }} />
+        <Btn onClick={submit} loading={saving} fullWidth>REGISTRER</Btn>
+      </Card>
+      {inspections.map((ins, i) => (
+        <Card key={ins.id || i} style={{ padding: '10px 14px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+            <span style={{ fontWeight: 700, color: C.text, fontSize: 12 }}>{ins.driver_name} #{ins.kart_no}</span>
+            <span style={{ color: C.textMuted, fontSize: 10 }}>{ins.session}</span>
+          </div>
+          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+            {[['video_ok', 'Video'], ['track_ok', 'Banen'], ['tech_ok', 'Teknik']].map(([k, l]) => (
+              <Badge key={k} color={ins[k] === true ? C.green : ins[k] === false ? C.red : C.textMuted} style={{ fontSize: 9 }}>{l}: {ins[k] === true ? 'OK' : ins[k] === false ? 'FEJL' : '—'}</Badge>
+            ))}
+          </div>
+        </Card>
+      ))}
+    </div>
+  );
+}
+
+// ── ADMIN LICENSE CONTROL ─────────────────────────────────────────
+export function AdminLicenseControl() {
+  const [events, setEvents] = useState([]);
+  const [selEv, setSelEv] = useState('');
+  const [selClass, setSelClass] = useState('Alle');
+  const [search, setSearch] = useState('');
+  const [drivers, setDrivers] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    supabase.from('events').select('id, name, classes').order('date').then(({ data }) => {
+      setEvents(data || []);
+      if (data?.[0]) setSelEv(data[0].id);
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!selEv) return;
+    setLoading(true);
+    Promise.all([
+      supabase.from('registrations').select('user_id, class, profiles(name, kart_number, license_number, license_valid)').eq('event_id', selEv),
+      supabase.from('license_checks').select('user_id, license_ok, friday_paid').eq('event_id', selEv),
+    ]).then(([regs, checks]) => {
+      const checkMap = {};
+      (checks.data || []).forEach(c => { checkMap[c.user_id] = c; });
+      const merged = (regs.data || []).map(r => ({
+        ...r, profiles: Array.isArray(r.profiles) ? r.profiles[0] : r.profiles,
+        license_ok: checkMap[r.user_id]?.license_ok ?? false,
+        friday_paid: checkMap[r.user_id]?.friday_paid ?? false,
+      })).sort((a, b) => (a.profiles?.kart_number || 0) - (b.profiles?.kart_number || 0));
+      setDrivers(merged);
+      setLoading(false);
+    });
+  }, [selEv]);
+
+  const toggle = async (userId, field, current) => {
+    setDrivers(prev => prev.map(d => d.user_id === userId ? { ...d, [field]: !current } : d));
+    await supabase.from('license_checks').upsert({ event_id: selEv, user_id: userId, [field]: !current, checked_by: 'Admin' }, { onConflict: 'event_id,user_id' });
+  };
+
+  const ev = events.find(e => e.id === selEv);
+  const classes = ['Alle', ...(ev?.classes || [])];
+  const filtered = drivers.filter(d => (selClass === 'Alle' || d.class === selClass) && (!search || String(d.profiles?.kart_number).includes(search) || d.profiles?.name?.toLowerCase().includes(search.toLowerCase())));
+  const totalOk = filtered.filter(d => d.license_ok).length;
+  const totalFriday = filtered.filter(d => d.friday_paid).length;
+
+  return (
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <div style={{ padding: '16px 20px 0', flexShrink: 0 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
+          <SectionHeader title="Licenskontrol" subtitle="Kontrol ved banen" />
+          <div style={{ display: 'flex', gap: 8 }}>
+            <div style={{ background: C.green + '22', border: `1px solid ${C.green}44`, borderRadius: 6, padding: '6px 12px', textAlign: 'center' }}>
+              <div style={{ color: C.green, fontWeight: 900, fontSize: 18 }}>{totalOk}/{filtered.length}</div>
+              <div style={{ color: C.green, fontSize: 9, letterSpacing: 1 }}>LICENS OK</div>
+            </div>
+            <div style={{ background: C.blue + '22', border: `1px solid ${C.blue}44`, borderRadius: 6, padding: '6px 12px', textAlign: 'center' }}>
+              <div style={{ color: C.blue, fontWeight: 900, fontSize: 18 }}>{totalFriday}/{filtered.length}</div>
+              <div style={{ color: C.blue, fontSize: 9, letterSpacing: 1 }}>FREDAG</div>
+            </div>
+          </div>
+        </div>
+        <Select label="Løb" value={selEv} onChange={setSelEv} options={events.map(e => ({ value: e.id, label: e.name }))} />
+        <div style={{ display: 'flex', gap: 6, overflowX: 'auto', marginBottom: 8, paddingBottom: 2 }}>
+          {classes.map((cls, i) => <button key={i} onClick={() => setSelClass(cls)} style={{ background: selClass === cls ? C.red : C.surface2, color: selClass === cls ? '#fff' : C.textMuted, border: `1px solid ${selClass === cls ? C.red : C.border}`, borderRadius: 20, padding: '4px 10px', fontSize: 10, cursor: 'pointer', whiteSpace: 'nowrap' }}>{cls}</button>)}
+        </div>
+        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="🔍  Søg kart # eller navn..." style={{ width: '100%', background: C.surface2, border: `1px solid ${C.border}`, borderRadius: 6, padding: '8px 12px', color: C.text, fontSize: 12, boxSizing: 'border-box', marginBottom: 8 }} />
+        <div style={{ display: 'grid', gridTemplateColumns: '56px 1fr 80px 80px', background: C.surface2, padding: '8px 14px', borderRadius: '6px 6px 0 0', border: `1px solid ${C.border}`, borderBottom: 'none' }}>
+          <span style={{ color: C.textMuted, fontSize: 10 }}>KART #</span>
+          <span style={{ color: C.textMuted, fontSize: 10 }}>NAVN</span>
+          <span style={{ color: C.green, fontSize: 10, textAlign: 'center' }}>✓ LICENS</span>
+          <span style={{ color: C.blue, fontSize: 10, textAlign: 'center' }}>💰 FREDAG</span>
+        </div>
+      </div>
+      <div style={{ flex: 1, overflowY: 'auto', padding: '0 20px 20px' }}>
+        {loading ? <Spinner /> : (
+          <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderTop: 'none', borderRadius: '0 0 6px 6px', overflow: 'hidden' }}>
+            {filtered.length === 0 && <EmptyState icon="🔍" message="Ingen kørere fundet" />}
+            {filtered.map((d, i) => (
+              <div key={d.user_id} style={{ display: 'grid', gridTemplateColumns: '56px 1fr 80px 80px', alignItems: 'center', padding: '10px 14px', borderBottom: i < filtered.length - 1 ? `1px solid ${C.border}` : 'none', background: d.license_ok && d.friday_paid ? 'rgba(0,204,102,0.04)' : 'transparent' }}>
+                <div style={{ fontWeight: 900, color: C.text, fontSize: 20, fontFamily: "'Barlow Condensed', sans-serif" }}>#{d.profiles?.kart_number}</div>
+                <div>
+                  <div style={{ fontWeight: 700, color: C.text, fontSize: 13 }}>{d.profiles?.name}</div>
+                  <div style={{ color: C.textMuted, fontSize: 11 }}>{d.profiles?.license_number} {d.profiles?.license_valid === true ? '✅' : d.profiles?.license_valid === false ? '❌' : ''}</div>
+                </div>
+                <div style={{ textAlign: 'center' }}>
+                  <button onClick={() => toggle(d.user_id, 'license_ok', d.license_ok)} style={{ width: 44, height: 36, borderRadius: 6, background: d.license_ok ? C.green + '33' : C.surface2, border: `2px solid ${d.license_ok ? C.green : C.border}`, cursor: 'pointer', fontSize: 18, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto' }}>{d.license_ok ? '✅' : '○'}</button>
+                </div>
+                <div style={{ textAlign: 'center' }}>
+                  <button onClick={() => toggle(d.user_id, 'friday_paid', d.friday_paid)} style={{ width: 44, height: 36, borderRadius: 6, background: d.friday_paid ? C.blue + '33' : C.surface2, border: `2px solid ${d.friday_paid ? C.blue : C.border}`, cursor: 'pointer', fontSize: 18, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto' }}>{d.friday_paid ? '💰' : '○'}</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
